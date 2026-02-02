@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>쌓기나무 3D 수학 도구</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>쌓기나무 3D 수학 도구</h1>
+        <p>
+          블록을 쌓아 입체도형을 만들고, 개수와 층별 정보를 확인해 보세요.
+        </p>
+      </header>
+      <section class="controls">
+        <div class="control-group">
+          <button id="add-layer" type="button">층 추가 (전체)</button>
+          <button id="remove-layer" type="button">층 제거 (전체)</button>
+          <button id="clear-blocks" type="button">전체 초기화</button>
+        </div>
+        <div class="control-group">
+          <label>
+            격자 크기
+            <input id="grid-size" type="range" min="3" max="8" step="1" value="5" />
+            <span id="grid-size-value">5 x 5</span>
+          </label>
+          <label>
+            층 높이
+            <input id="layer-count" type="range" min="1" max="6" step="1" value="3" />
+            <span id="layer-count-value">3 층</span>
+          </label>
+        </div>
+      </section>
+      <main>
+        <div class="canvas-wrap">
+          <div id="runtime-warning" class="runtime-warning" hidden>
+            <strong>⚠️ 실행 안내:</strong>
+            <span>
+              이 도구는 로컬 파일로 열면 정상 표시되지 않을 수 있습니다.
+              <br />
+              터미널에서 <code>python -m http.server</code> 실행 후
+              <code>http://localhost:8000/index.html</code>로 접속해 주세요.
+            </span>
+          </div>
+          <canvas id="stack-canvas" aria-label="3D 쌓기나무 캔버스"></canvas>
+          <div class="hint">
+            <p>✅ 블록을 클릭하면 위에 새 블록이 추가됩니다.</p>
+            <p>✅ 빈 격자를 클릭하면 바닥에 블록이 놓입니다.</p>
+            <p>✅ Shift + 클릭하면 해당 블록을 제거합니다.</p>
+          </div>
+        </div>
+        <aside class="summary">
+          <h2>도형 요약</h2>
+          <dl>
+            <div>
+              <dt>총 블록 수</dt>
+              <dd id="total-count">0</dd>
+            </div>
+            <div>
+              <dt>최고 층</dt>
+              <dd id="max-height">0</dd>
+            </div>
+            <div>
+              <dt>층별 블록</dt>
+              <dd id="layer-breakdown">-</dd>
+            </div>
+          </dl>
+          <div class="tips">
+            <h3>활용 팁</h3>
+            <ul>
+              <li>블록 수를 세어 부피 개념을 익혀보세요.</li>
+              <li>층별 분포를 보며 입체도형의 단면을 상상해보세요.</li>
+              <li>격자 크기를 바꿔 다양한 문제를 만들어보세요.</li>
+            </ul>
+          </div>
+        </aside>
+      </main>
+      <footer>
+        <p>마우스로 회전, 스크롤로 확대/축소 가능합니다.</p>
+      </footer>
+    </div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
