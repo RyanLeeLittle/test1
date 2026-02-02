@@ -97,22 +97,6 @@ main {
   min-height: 480px;
 }
 
-.runtime-warning {
-  position: absolute;
-  inset: 1rem;
-  background: rgba(255, 235, 207, 0.95);
-  border: 1px solid #f5b74f;
-  border-radius: 12px;
-  padding: 1rem;
-  color: #7a4b00;
-  font-size: 0.95rem;
-  line-height: 1.4;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  z-index: 2;
-}
-
 canvas {
   width: 100%;
   height: 420px;

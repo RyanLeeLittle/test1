@@ -1,6 +1,3 @@
-import * as THREE from "https://unpkg.com/three@0.161.0/build/three.module.js";
-import { OrbitControls } from "https://unpkg.com/three@0.161.0/examples/jsm/controls/OrbitControls.js";
-
 const canvas = document.querySelector("#stack-canvas");
 const totalCountEl = document.querySelector("#total-count");
 const maxHeightEl = document.querySelector("#max-height");
@@ -9,7 +6,6 @@ const gridSizeInput = document.querySelector("#grid-size");
 const gridSizeValue = document.querySelector("#grid-size-value");
 const layerCountInput = document.querySelector("#layer-count");
 const layerCountValue = document.querySelector("#layer-count-value");
-const runtimeWarningEl = document.querySelector("#runtime-warning");
 
 const addLayerBtn = document.querySelector("#add-layer");
 const removeLayerBtn = document.querySelector("#remove-layer");
@@ -18,17 +14,12 @@ const clearBtn = document.querySelector("#clear-blocks");
 const scene = new THREE.Scene();
 scene.background = new THREE.Color("#f7f9ff");
 
-const isFileProtocol = window.location.protocol === "file:";
-if (runtimeWarningEl && isFileProtocol) {
-  runtimeWarningEl.hidden = false;
-}
-
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio || 1);
 
-const controls = new OrbitControls(camera, renderer.domElement);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.minDistance = 6;
 controls.maxDistance = 30;
