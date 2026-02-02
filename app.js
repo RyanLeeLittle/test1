@@ -18,7 +18,8 @@ const colors = {
   left: "#5a6fe0",
   right: "#4b5cc5",
   stroke: "#2a365c",
-  grid: "#ccd4f6",
+  grid: "#9aa7df",
+  base: "#eef1ff",
 };
 
 const state = {
@@ -54,6 +55,15 @@ function isoProject(x, z, y) {
 }
 
 function drawGrid() {
+  const baseCorners = [
+    isoProject(0, 0, 0),
+    isoProject(state.gridSize, 0, 0),
+    isoProject(state.gridSize, state.gridSize, 0),
+    isoProject(0, state.gridSize, 0),
+  ];
+  ctx.fillStyle = colors.base;
+  fillPolygon(baseCorners);
+
   ctx.lineWidth = 1;
   ctx.strokeStyle = colors.grid;
   for (let x = 0; x <= state.gridSize; x += 1) {
@@ -72,6 +82,22 @@ function drawGrid() {
     ctx.lineTo(end.x, end.y);
     ctx.stroke();
   }
+}
+
+function seedExample() {
+  const mid = Math.floor(state.gridSize / 2);
+  const pattern = [
+    { x: mid, z: mid, h: 3 },
+    { x: mid - 1, z: mid, h: 2 },
+    { x: mid + 1, z: mid, h: 2 },
+    { x: mid, z: mid - 1, h: 1 },
+    { x: mid, z: mid + 1, h: 1 },
+  ];
+  pattern.forEach(({ x, z, h }) => {
+    if (x >= 0 && z >= 0 && x < state.gridSize && z < state.gridSize) {
+      state.blocks[x][z] = Math.min(h, state.maxLayers);
+    }
+  });
 }
 
 function drawBlock(x, z, height) {
@@ -241,6 +267,7 @@ function handleLayerChange() {
 function init() {
   resizeCanvas();
   initBlocks();
+  seedExample();
   updateSummary();
   drawScene();
 }
