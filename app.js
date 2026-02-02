@@ -11,279 +11,245 @@ const addLayerBtn = document.querySelector("#add-layer");
 const removeLayerBtn = document.querySelector("#remove-layer");
 const clearBtn = document.querySelector("#clear-blocks");
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color("#f7f9ff");
+const ctx = canvas.getContext("2d");
 
-const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+const colors = {
+  top: "#7f9bff",
+  left: "#5a6fe0",
+  right: "#4b5cc5",
+  stroke: "#2a365c",
+  grid: "#ccd4f6",
+};
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio || 1);
+const state = {
+  gridSize: Number(gridSizeInput.value),
+  maxLayers: Number(layerCountInput.value),
+  blocks: [],
+  tileWidth: 70,
+  tileHeight: 36,
+  blockHeight: 34,
+  offsetX: 0,
+  offsetY: 0,
+};
 
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.minDistance = 6;
-controls.maxDistance = 30;
-
-const ambient = new THREE.AmbientLight(0xffffff, 0.75);
-scene.add(ambient);
-
-const directional = new THREE.DirectionalLight(0xffffff, 0.7);
-directional.position.set(6, 10, 4);
-scene.add(directional);
-
-const gridGroup = new THREE.Group();
-scene.add(gridGroup);
-
-const blockGroup = new THREE.Group();
-scene.add(blockGroup);
-
-const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
-
-const blockSize = 1;
-let gridSize = Number(gridSizeInput.value);
-let maxLayers = Number(layerCountInput.value);
-let blocks = [];
-
-const blockMaterial = new THREE.MeshStandardMaterial({
-  color: "#4f6df5",
-  roughness: 0.35,
-  metalness: 0.1,
-});
-
-const highlightMaterial = new THREE.MeshStandardMaterial({
-  color: "#f5b74f",
-  roughness: 0.4,
-  metalness: 0.05,
-});
-
-let hoverMesh = null;
-
-function createGrid() {
-  gridGroup.clear();
-  const gridHelper = new THREE.GridHelper(
-    gridSize * blockSize,
-    gridSize,
-    "#a9b7e8",
-    "#d5dcf4"
+function initBlocks() {
+  state.blocks = Array.from({ length: state.gridSize }, () =>
+    Array.from({ length: state.gridSize }, () => 0)
   );
-  gridHelper.position.y = 0;
-  gridGroup.add(gridHelper);
 }
 
-function resetCamera() {
-  const distance = gridSize * 1.4;
-  camera.position.set(distance, distance * 0.9, distance);
-  camera.lookAt(0, 0, 0);
-  controls.update();
-}
-
-function resizeRenderer() {
+function resizeCanvas() {
   const { clientWidth, clientHeight } = canvas;
-  const width = clientWidth;
-  const height = clientHeight;
-  if (width === 0 || height === 0) return;
-  renderer.setSize(width, height, false);
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
+  canvas.width = Math.max(1, clientWidth * window.devicePixelRatio);
+  canvas.height = Math.max(1, clientHeight * window.devicePixelRatio);
+  ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+  state.offsetX = clientWidth / 2;
+  state.offsetY = clientHeight * 0.65;
 }
 
-function blockKey(x, y, z) {
-  return `${x},${y},${z}`;
+function isoProject(x, z, y) {
+  const screenX = (x - z) * (state.tileWidth / 2) + state.offsetX;
+  const screenY = (x + z) * (state.tileHeight / 2) + state.offsetY - y;
+  return { x: screenX, y: screenY };
 }
 
-function rebuildBlocks() {
-  blockGroup.clear();
-  blocks.forEach((block) => {
-    const mesh = createBlockMesh(block, blockMaterial);
-    blockGroup.add(mesh);
-  });
-}
-
-function createBlockMesh({ x, y, z }, material) {
-  const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.set(x, y + blockSize / 2, z);
-  mesh.userData = { x, y, z };
-  return mesh;
-}
-
-function getGridCoordinate(point) {
-  const half = (gridSize * blockSize) / 2;
-  const x = Math.floor((point.x + half) / blockSize) * blockSize + blockSize / 2 - half;
-  const z = Math.floor((point.z + half) / blockSize) * blockSize + blockSize / 2 - half;
-  return { x, z };
-}
-
-function getTopHeight(x, z) {
-  let maxY = -blockSize;
-  blocks.forEach((block) => {
-    if (block.x === x && block.z === z) {
-      maxY = Math.max(maxY, block.y);
-    }
-  });
-  return maxY;
-}
-
-function addBlock(x, y, z) {
-  if (y / blockSize >= maxLayers) return;
-  const key = blockKey(x, y, z);
-  if (blocks.some((block) => blockKey(block.x, block.y, block.z) === key)) {
-    return;
+function drawGrid() {
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = colors.grid;
+  for (let x = 0; x <= state.gridSize; x += 1) {
+    const start = isoProject(x, 0, 0);
+    const end = isoProject(x, state.gridSize, 0);
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
   }
-  blocks.push({ x, y, z });
-  rebuildBlocks();
-  updateSummary();
+  for (let z = 0; z <= state.gridSize; z += 1) {
+    const start = isoProject(0, z, 0);
+    const end = isoProject(state.gridSize, z, 0);
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+  }
 }
 
-function removeBlock(x, y, z) {
-  const key = blockKey(x, y, z);
-  blocks = blocks.filter((block) => blockKey(block.x, block.y, block.z) !== key);
-  rebuildBlocks();
-  updateSummary();
+function drawBlock(x, z, height) {
+  const baseY = height * state.blockHeight;
+  const top = isoProject(x, z, baseY + state.blockHeight);
+  const right = isoProject(x + 1, z, baseY + state.blockHeight);
+  const front = isoProject(x + 1, z + 1, baseY + state.blockHeight);
+  const left = isoProject(x, z + 1, baseY + state.blockHeight);
+
+  const topFace = [top, right, front, left];
+  const rightFace = [right, isoProject(x + 1, z, baseY), isoProject(x + 1, z + 1, baseY), front];
+  const leftFace = [left, front, isoProject(x, z + 1, baseY), isoProject(x, z, baseY)];
+
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = colors.stroke;
+
+  ctx.fillStyle = colors.right;
+  fillPolygon(rightFace);
+
+  ctx.fillStyle = colors.left;
+  fillPolygon(leftFace);
+
+  ctx.fillStyle = colors.top;
+  fillPolygon(topFace);
+}
+
+function fillPolygon(points) {
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
+function drawScene() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawGrid();
+
+  const blocksToDraw = [];
+  for (let x = 0; x < state.gridSize; x += 1) {
+    for (let z = 0; z < state.gridSize; z += 1) {
+      const height = state.blocks[x][z];
+      for (let y = 0; y < height; y += 1) {
+        blocksToDraw.push({ x, z, y });
+      }
+    }
+  }
+
+  blocksToDraw.sort((a, b) => (a.x + a.z + a.y) - (b.x + b.z + b.y));
+  blocksToDraw.forEach((block) => drawBlock(block.x, block.z, block.y));
 }
 
 function updateSummary() {
-  totalCountEl.textContent = blocks.length.toString();
-  const maxHeight = blocks.reduce((max, block) => Math.max(max, block.y / blockSize + 1), 0);
-  maxHeightEl.textContent = maxHeight.toString();
+  let total = 0;
+  let maxHeight = 0;
+  const layerCounts = Array.from({ length: state.maxLayers }, () => 0);
 
-  const layerCounts = Array.from({ length: maxLayers }, () => 0);
-  blocks.forEach((block) => {
-    const layerIndex = block.y / blockSize;
-    if (layerCounts[layerIndex] !== undefined) {
-      layerCounts[layerIndex] += 1;
+  for (let x = 0; x < state.gridSize; x += 1) {
+    for (let z = 0; z < state.gridSize; z += 1) {
+      const height = state.blocks[x][z];
+      total += height;
+      maxHeight = Math.max(maxHeight, height);
+      for (let y = 0; y < height; y += 1) {
+        if (layerCounts[y] !== undefined) {
+          layerCounts[y] += 1;
+        }
+      }
     }
-  });
-  const breakdown = layerCounts
-    .map((count, index) => `${index + 1}층: ${count}`)
-    .join(" · ");
-  layerBreakdownEl.textContent = breakdown || "-";
+  }
+
+  totalCountEl.textContent = total.toString();
+  maxHeightEl.textContent = maxHeight.toString();
+  layerBreakdownEl.textContent = layerCounts.length
+    ? layerCounts.map((count, index) => `${index + 1}층: ${count}`).join(" · ")
+    : "-";
+}
+
+function clampHeight(x, z) {
+  state.blocks[x][z] = Math.min(state.blocks[x][z], state.maxLayers);
+}
+
+function handleCanvasClick(event) {
+  const rect = canvas.getBoundingClientRect();
+  const pointerX = event.clientX - rect.left - state.offsetX;
+  const pointerY = event.clientY - rect.top - state.offsetY;
+
+  const isoX = (pointerX / (state.tileWidth / 2) + pointerY / (state.tileHeight / 2)) / 2;
+  const isoZ = (pointerY / (state.tileHeight / 2) - pointerX / (state.tileWidth / 2)) / 2;
+
+  const gridX = Math.floor(isoX);
+  const gridZ = Math.floor(isoZ);
+
+  if (gridX < 0 || gridZ < 0 || gridX >= state.gridSize || gridZ >= state.gridSize) {
+    return;
+  }
+
+  if (event.shiftKey) {
+    state.blocks[gridX][gridZ] = Math.max(0, state.blocks[gridX][gridZ] - 1);
+  } else {
+    state.blocks[gridX][gridZ] = Math.min(state.maxLayers, state.blocks[gridX][gridZ] + 1);
+  }
+
+  updateSummary();
+  drawScene();
 }
 
 function addLayer() {
-  const newBlocks = [];
-  blocks.forEach((block) => {
-    newBlocks.push(block);
-    const nextY = block.y + blockSize;
-    if (nextY / blockSize < maxLayers) {
-      newBlocks.push({ x: block.x, y: nextY, z: block.z });
+  for (let x = 0; x < state.gridSize; x += 1) {
+    for (let z = 0; z < state.gridSize; z += 1) {
+      if (state.blocks[x][z] < state.maxLayers) {
+        state.blocks[x][z] += 1;
+      }
     }
-  });
-  blocks = newBlocks;
-  rebuildBlocks();
+  }
   updateSummary();
+  drawScene();
 }
 
 function removeLayer() {
-  const highest = blocks.reduce((max, block) => Math.max(max, block.y), -blockSize);
-  if (highest < 0) return;
-  blocks = blocks.filter((block) => block.y !== highest);
-  rebuildBlocks();
+  let highest = 0;
+  for (let x = 0; x < state.gridSize; x += 1) {
+    for (let z = 0; z < state.gridSize; z += 1) {
+      highest = Math.max(highest, state.blocks[x][z]);
+    }
+  }
+  if (highest === 0) return;
+
+  for (let x = 0; x < state.gridSize; x += 1) {
+    for (let z = 0; z < state.gridSize; z += 1) {
+      if (state.blocks[x][z] === highest) {
+        state.blocks[x][z] -= 1;
+      }
+    }
+  }
+
   updateSummary();
+  drawScene();
 }
 
 function clearBlocks() {
-  blocks = [];
-  rebuildBlocks();
+  initBlocks();
   updateSummary();
-}
-
-function updateHover(target) {
-  if (hoverMesh) {
-    scene.remove(hoverMesh);
-    hoverMesh.geometry.dispose();
-    hoverMesh = null;
-  }
-  if (!target) return;
-  hoverMesh = createBlockMesh(target, highlightMaterial);
-  hoverMesh.material.transparent = true;
-  hoverMesh.material.opacity = 0.5;
-  scene.add(hoverMesh);
-}
-
-function onPointerMove(event) {
-  const rect = canvas.getBoundingClientRect();
-  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(pointer, camera);
-
-  const intersects = raycaster.intersectObjects(blockGroup.children, true);
-  if (intersects.length > 0) {
-    const hit = intersects[0].object.userData;
-    updateHover({ x: hit.x, y: hit.y + blockSize, z: hit.z });
-    return;
-  }
-
-  const planeIntersect = raycaster.intersectObjects(gridGroup.children, true);
-  if (planeIntersect.length > 0) {
-    const point = planeIntersect[0].point;
-    const { x, z } = getGridCoordinate(point);
-    updateHover({ x, y: 0, z });
-  }
-}
-
-function onPointerClick(event) {
-  const rect = canvas.getBoundingClientRect();
-  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(pointer, camera);
-
-  const intersects = raycaster.intersectObjects(blockGroup.children, true);
-  if (intersects.length > 0) {
-    const hit = intersects[0].object.userData;
-    if (event.shiftKey) {
-      removeBlock(hit.x, hit.y, hit.z);
-      return;
-    }
-    addBlock(hit.x, hit.y + blockSize, hit.z);
-    return;
-  }
-
-  const planeIntersect = raycaster.intersectObjects(gridGroup.children, true);
-  if (planeIntersect.length > 0) {
-    const point = planeIntersect[0].point;
-    const { x, z } = getGridCoordinate(point);
-    if (event.shiftKey) {
-      const topHeight = getTopHeight(x, z);
-      if (topHeight >= 0) {
-        removeBlock(x, topHeight, z);
-      }
-      return;
-    }
-    addBlock(x, 0, z);
-  }
+  drawScene();
 }
 
 function handleGridChange() {
-  gridSize = Number(gridSizeInput.value);
-  gridSizeValue.textContent = `${gridSize} x ${gridSize}`;
-  createGrid();
-  resetCamera();
+  state.gridSize = Number(gridSizeInput.value);
+  gridSizeValue.textContent = `${state.gridSize} x ${state.gridSize}`;
+  initBlocks();
+  updateSummary();
+  drawScene();
 }
 
 function handleLayerChange() {
-  maxLayers = Number(layerCountInput.value);
-  layerCountValue.textContent = `${maxLayers} 층`;
-  blocks = blocks.filter((block) => block.y / blockSize < maxLayers);
-  rebuildBlocks();
+  state.maxLayers = Number(layerCountInput.value);
+  layerCountValue.textContent = `${state.maxLayers} 층`;
+  for (let x = 0; x < state.gridSize; x += 1) {
+    for (let z = 0; z < state.gridSize; z += 1) {
+      clampHeight(x, z);
+    }
+  }
   updateSummary();
+  drawScene();
 }
 
-function animate() {
-  resizeRenderer();
-  controls.update();
-  renderer.render(scene, camera);
-  requestAnimationFrame(animate);
+function init() {
+  resizeCanvas();
+  initBlocks();
+  updateSummary();
+  drawScene();
 }
 
-createGrid();
-resetCamera();
-updateSummary();
-
-canvas.addEventListener("pointermove", onPointerMove);
-canvas.addEventListener("pointerleave", () => updateHover(null));
-canvas.addEventListener("click", onPointerClick);
+canvas.addEventListener("click", handleCanvasClick);
+window.addEventListener("resize", () => {
+  resizeCanvas();
+  drawScene();
+});
 
 addLayerBtn.addEventListener("click", addLayer);
 removeLayerBtn.addEventListener("click", removeLayer);
@@ -292,6 +258,4 @@ clearBtn.addEventListener("click", clearBlocks);
 gridSizeInput.addEventListener("input", handleGridChange);
 layerCountInput.addEventListener("input", handleLayerChange);
 
-window.addEventListener("resize", resizeRenderer);
-
-animate();
+init();
